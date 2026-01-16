@@ -1,0 +1,36 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: eventmesh-routing
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - eventmesh-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /api/events
+      route:
+        - destination:
+            host: event-service
+            port:
+              number: 8081
+
+    - match:
+        - uri:
+            prefix: /api/bookings
+      route:
+        - destination:
+            host: booking-service
+            port:
+              number: 8082
+
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: frontend
+            port:
+              number: 80
