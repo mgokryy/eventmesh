@@ -1,52 +1,51 @@
-# EventMesh Projet Conteneurisation & Virtualisation
+## EventMesh – Microservices Docker / Kubernetes (Minikube + Ingress NGINX)
 
-## 1. Objectif du projet
+### 1. Objectif du projet
 
-EventMesh est une application **microservices** utilisée comme support technique pour démontrer l’utilisation de :
+EventMesh est une petite application **microservices** servant de support pédagogique pour :
 
-- Docker (conteneurisation)
-- Kubernetes (orchestration et virtualisation applicative)
-- Réseau virtualisé Kubernetes (Service + DNS)
-- Stockage persistant (PersistentVolumeClaim)
-- Exposition réseau via proxy (Istio Ingress Gateway)
+- **Docker**: conteneurisation des services
+- **Kubernetes**: déploiement et orchestration
+- **Services + DNS Kubernetes**: communication inter‑pods
+- **PVC**: persistance des données PostgreSQL
+- **Ingress NGINX**: exposition HTTP unique vers le frontend et les APIs
 
-Le but du projet est **l’infrastructure cloud-native**, et non la complexité fonctionnelle de l’application.
+L’objectif est de comprendre l’**infrastructure cloud‑native**, plus que la logique métier.
 
-## 2. Architecture générale
+---
 
-```
-Client Web (Navigateur)
+### 2. Architecture
+
+```text
+Client Web (navigateur)
         |
         v
-Istio Ingress Gateway (proxy)
+Ingress NGINX (eventmesh.local)
         |
-        +--> Frontend (React + Nginx)
+        +--> Service frontend  (React + Nginx)
         |
-        +--> Event Service (Node.js / Express)
+        +--> Service event-service   (Node.js / Express, lecture events)
         |
-        +--> Booking Service (Node.js / Express)
+        +--> Service booking-service (Node.js / Express, réservations)
                      |
                      v
                PostgreSQL (PVC)
 ```
 
-Tous les composants sont exécutés sous forme de **conteneurs Docker** orchestrés par **Kubernetes**.
+Tous les composants sont packagés en **images Docker** et déployés sur **Kubernetes (minikube)**.
 
-## 3. Prérequis
+---
 
-### 3.1 Système
+### 3. Prérequis
 
-- Windows 10 / 11 (testé)
-- Docker Desktop configuré en **Linux containers**
+- **Système**: Windows 10 / 11
+- **Outils**:
+  - Docker Desktop (mode **Linux containers**)
+  - `kubectl`
+  - `minikube`
+  - `git`
 
-### 3.2 Outils requis
-
-- Docker Desktop
-- kubectl
-- Minikube
-- Git
-
-Vérification :
+Vérification rapide :
 
 ```bash
 docker --version
@@ -54,127 +53,202 @@ kubectl version --client
 minikube version
 ```
 
-## 4. Installation du projet
+---
 
-### 4.1 Clonage du dépôt
+### 4. Installation du projet
 
 ```bash
 git clone <URL_DU_REPO>
 cd eventmesh
 ```
 
-Structure attendue :
-```
+Structure utile :
+
+```text
 eventmesh/
-├── frontend/
-├── event-service/
-├── booking-service/
-├── k8s/
-└── README.md
+├── frontend/          # SPA React + Nginx
+├── event-service/     # API lecture d’événements
+├── booking-service/   # API réservations
+├── k8s/               # manifests Kubernetes (services, ingress, postgres…)
+└── readme.md
 ```
 
-## 5. Démarrage du cluster Kubernetes
+---
+
+### 5. Démarrer le cluster Kubernetes (minikube)
 
 ```bash
 minikube start
-```
-
-Vérification :
-```bash
 kubectl get nodes
 ```
 
-## 6. Installation d'Istio
+Le nœud `minikube` doit être en `Ready`.
 
-Le projet utilise Istio Service Mesh pour :
+---
 
-- Ingress Gateway
-- Proxy Envoy
-- Routage HTTP
-- VirtualService et Gateway
+### 6. Commandes pour lancer et tester le projet (Windows / macOS / Linux)
 
-Installation:
+Cette section donne les **commandes dans l’ordre** pour quelqu’un qui veut juste faire tourner le projet.
 
-```bash
-curl -L https://istio.io/downloadIstio | sh -
-cd istio-*
-export PATH=$PWD/bin:$PATH
+#### 6.1 Windows (PowerShell)
+
+```powershell
+# 1) Cloner le projet
+git clone <URL_DU_REPO>
+cd eventmesh
+
+# 2) Vérifier les outils
+docker --version
+kubectl version --client
+minikube version
+
+# 3) Démarrer Minikube
+minikube start
+
+# 4) Installer l’ingress NGINX (une seule fois)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+kubectl wait --namespace ingress-nginx `
+  --for=condition=ready pod `
+  --selector=app.kubernetes.io/component=controller `
+  --timeout=180s
+
+# 5) Déployer tous les manifests Kubernetes
+kubectl apply -R -f k8s/
+kubectl get pods
+
+# 6) Initialiser la base PostgreSQL (les commandes SQL sont en section 8)
+kubectl exec -it postgres-XXXXX -- psql -U admin -d eventdb
+
+# 7) Configurer l’hôte local et lancer le port‑forward
+#   dans C:\Windows\System32\drivers\etc\hosts ajouter :
+#   127.0.0.1 eventmesh.local
+kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80
 ```
 
-Installation du profil demo:`
+Puis ouvrir dans le navigateur :
+
+- `http://eventmesh.local:8080/`
+- `http://eventmesh.local:8080/api/events`
+- `http://eventmesh.local:8080/api/bookings`
+
+#### 6.2 macOS / Linux (bash)
 
 ```bash
-istioctl install --set profile=demo -y
+# 1) Cloner le projet
+git clone <URL_DU_REPO>
+cd eventmesh
+
+# 2) Vérifier les outils
+docker --version
+kubectl version --client
+minikube version
+
+# 3) Démarrer Minikube
+minikube start
+
+# 4) Installer l’ingress NGINX (une seule fois)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=180s
+
+# 5) Déployer tous les manifests Kubernetes
+kubectl apply -R -f k8s/
+kubectl get pods
+
+# 6) Initialiser la base PostgreSQL (les commandes SQL sont en section 8)
+kubectl exec -it postgres-XXXXX -- psql -U admin -d eventdb
+
+# 7) Configurer /etc/hosts et lancer le port‑forward
+#   dans /etc/hosts ajouter :
+#   127.0.0.1 eventmesh.local
+kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80
 ```
 
-Activation de l’injection automatique :
+Puis ouvrir dans le navigateur :
+
+- `http://eventmesh.local:8080/`
+- `http://eventmesh.local:8080/api/events`
+- `http://eventmesh.local:8080/api/bookings`
+
+---
+
+### 6. Déploiement Kubernetes
+
+Depuis la racine du projet :
 
 ```bash
-kubectl label namespace default istio-injection=enabled
+kubectl apply -R -f k8s/
 ```
 
-Vérification :
-
-```bash
-kubectl get pods -n istio-system
-```
-
-Tous les pods doivent être à l’état Running.
-
-## 7. Déploiement de l’application
-
-Depuis la racine du projet :
-
-```bash
-kubectl apply -f k8s/ -R
-```
-
-Vérifier :
+Vérification :
 
 ```bash
 kubectl get pods
-kubectl get services
+kubectl get svc
 kubectl get pvc
 ```
 
-Tous les pods doivent être à l’état `Running` et le PVC PostgreSQL à l’état `Bound`.
+Attendu :
 
-## 8. Exposition de l’application (Tout systeme)
+- `postgres`, `event-service`, `booking-service`, `frontend` en **Running**
+- `postgres-pvc` en **Bound**
 
-## 8.1. Lancer le tunnel réseau 
+---
 
-Linux / macOS:
+### 7. Ingress NGINX et accès navigateur
 
-```bash
-sudo minikube tunnel
-```
+Le projet utilise l’Ingress NGINX standard (`k8s/ingress.yml`) avec l’hôte `eventmesh.local`.
 
-Sur Windows :
-
-```bash
-minikube tunnel
-```
-
-Le terminal doit rester ouvert.
-
-## 8.2. Récupérer l'URL
-
-Accès :
+#### 7.1 Installer l’ingress-nginx controller (si besoin)
 
 ```bash
-minikube service -n istio-system istio-ingressgateway --url
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=180s
 ```
 
-## 9. Initialisation de la base de données
+> Si tu as déjà suivi la section Quickstart, cette étape est déjà faite.
 
-### 9.1 Accès à PostgreSQL
+#### 7.2 Configuration DNS locale
+
+Éditer (en administrateur) le fichier `C:\Windows\System32\drivers\etc\hosts` :
+
+```text
+127.0.0.1 eventmesh.local
+```
+
+#### 7.3 Port‑forward de l’Ingress vers la machine locale
+
+Dans un terminal dédié (à laisser ouvert) :
+
+```bash
+kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80
+```
+
+#### 7.4 URLs à tester dans le navigateur
+
+- **Frontend** : `http://eventmesh.local:8080/`
+- **API events** : `http://eventmesh.local:8080/api/events`
+- **API bookings** : `http://eventmesh.local:8080/api/bookings`
+
+Si ces trois URLs répondent, l’Ingress et le routage applicatif sont fonctionnels.
+
+---
+
+### 8. Initialisation de la base PostgreSQL (obligatoire pour voir des données)
+
+1) Ouvrir un shell Postgres dans le pod :
 
 ```bash
 kubectl get pods
 kubectl exec -it postgres-XXXXX -- psql -U admin -d eventdb
 ```
 
-### 9.2 Création des tables
+2) Créer les tables :
 
 ```sql
 CREATE TABLE events (
@@ -183,9 +257,7 @@ CREATE TABLE events (
     date DATE NOT NULL,
     capacity INTEGER NOT NULL
 );
-```
 
-```sql
 CREATE TABLE bookings (
     id SERIAL PRIMARY KEY,
     event_id INTEGER REFERENCES events(id),
@@ -195,38 +267,38 @@ CREATE TABLE bookings (
 );
 ```
 
-### 9.3 Insertion des événements
+3) Insérer quelques événements :
 
 ```sql
 INSERT INTO events (title, date, capacity) VALUES
 ('Cloud Conference', '2026-03-01', 100),
 ('Kubernetes Workshop', '2026-04-10', 50),
 ('DevOps Meetup', '2026-05-20', 30);
-```
 
-Vérification :
-
-```sql
 SELECT * FROM events;
 \q
 ```
 
-## 10. Test fonctionnel
+---
 
-1. Ouvrir http://<INGRESS-IP>
-2. Vérifier l’affichage des événements
-3. Sélectionner un événement
-4. Entrer un nom et un nombre de places
-5. Cliquer sur **Réserver**
+### 9. Scénario fonctionnel
 
-## 11. Tests techniques (réseau Kubernetes)
+1. Ouvrir `http://eventmesh.local:8080/` dans le navigateur.
+2. Vérifier la liste des **événements** chargés depuis `event-service`.
+3. Sélectionner un événement, saisir un nom et une quantité.
+4. Cliquer sur **Réserver** → une nouvelle entrée est créée dans `bookings`.
+5. (Optionnel) Vérifier dans PostgreSQL : `SELECT * FROM bookings;`.
 
-### 11.1 APIs via Ingress
+---
 
-- `http://<INGRESS-IP>/api/events`
-- `http://<INGRESS-IP>/api/bookings`
+### 10. Tests réseau Kubernetes
 
-### 11.2 Communication inter-services
+#### 10.1 APIs via Ingress
+
+- `http://eventmesh.local:8080/api/events`
+- `http://eventmesh.local:8080/api/bookings`
+
+#### 10.2 Communication inter‑services (DNS interne)
 
 ```bash
 kubectl exec -it event-service-XXXXX -- sh
@@ -236,65 +308,112 @@ curl http://event-service:8081/api/events
 exit
 ```
 
-Ces tests prouvent le fonctionnement du **DNS interne Kubernetes** et du **réseau virtualisé**.
+Ces commandes valident le **DNS interne Kubernetes** (`booking-service`, `event-service`) et le réseau virtuel des Services.
 
-## 12. Persistance des données (PVC)
+---
+
+### 11. Persistance (PVC PostgreSQL)
+
+1. Compter les événements :
 
 ```bash
-kubectl exec -it postgres-XXXXX -- psql -U admin -d eventdb -c "SELECT count(*) FROM events;"
+kubectl exec -it postgres-XXXXX -- \
+  psql -U admin -d eventdb -c "SELECT count(*) FROM events;"
 ```
 
-Redémarrer le pod PostgreSQL :
+2. Redémarrer le pod PostgreSQL :
+
 ```bash
 kubectl delete pod postgres-XXXXX
 kubectl get pods
 ```
 
-Vérifier à nouveau :
+3. Recompter :
+
 ```bash
-kubectl exec -it postgres-NEWXXXXX -- psql -U admin -d eventdb -c "SELECT count(*) FROM events;"
+kubectl exec -it postgres-NEWXXXXX -- \
+  psql -U admin -d eventdb -c "SELECT count(*) FROM events;"
 ```
 
-Les données doivent être conservées.
+Le nombre doit être identique : les données sont conservées grâce au **PersistentVolumeClaim**.
 
-## 13. Nettoyage
+---
+
+### 12. (Optionnel) Rebuilder et publier votre propre image frontend
+
+Par défaut, le frontend est une image publique référencée dans `k8s/frontend/deployment.yml`.  
+Si vous modifiez le code du frontend, publiez votre image Docker Hub et mettez à jour le manifest.
 
 ```bash
-kubectl delete -f k8s/
+cd frontend
+docker build -t MONUSER/eventmesh-frontend:ingress .
+docker login
+docker push MONUSER/eventmesh-frontend:ingress
+```
+
+Puis dans `k8s/frontend/deployment.yml` :
+
+```yaml
+image: MONUSER/eventmesh-frontend:ingress
+```
+
+---
+
+### 13. Dépannage (les erreurs les plus courantes)
+
+- **`ImagePullBackOff` / `ErrImagePull` sur le frontend**
+  - Vérifier que l’image indiquée dans `k8s/frontend/deployment.yml` existe réellement sur Docker Hub.
+  - Diagnostic :
+
+```bash
+kubectl describe pod -l app=frontend
+```
+
+- **Le navigateur n’accède pas à `eventmesh.local`**
+  - Vérifier `hosts` (Windows) : `127.0.0.1 eventmesh.local`
+  - Vérifier que le port-forward tourne :
+
+```bash
+kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80
+```
+
+- **Pas d’événements affichés**
+  - Faire l’initialisation Postgres (section 8) et vérifier :
+
+```bash
+kubectl exec -it postgres-XXXXX -- psql -U admin -d eventdb -c "SELECT * FROM events;"
+```
+
+---
+
+### 14. Nettoyage
+
+```bash
+kubectl delete -R -f k8s/
 minikube stop
 ```
 
-## 14. Captures d’écran
+---
 
-### Interface utilisateur
+### 15. Captures d’écran
 
-![UI](./docs/ui.png)
+- Interface utilisateur : `./docs/ui.png`
+- État du cluster Kubernetes : `./docs/kubectl-pods.png`
+- Communication inter‑services : `./docs/interservice-curl.png`
 
-### État du cluster Kubernetes
+---
 
-![Pods](./docs/kubectl-pods.png)
+### 16. Résumé technique
 
-### Exposition via Istio Ingress Gateway
+- **Docker** : construction et distribution des images
+- **Kubernetes / minikube** : orchestration locale
+- **Services + DNS** : découverte et communication entre microservices
+- **PVC** : persistance de la base PostgreSQL
+- **Ingress NGINX** : point d’entrée unique pour frontend + APIs
+- **Stack applicative** : Node.js / Express, React, PostgreSQL
 
-![Istio](./docs/istio-ingress.png)
+---
 
-### Communication inter-services (DNS Kubernetes)
+### Auteur
 
-![Interservice](./docs/interservice-curl.png)
-
-## 15. Résumé technique
-
-- Docker : conteneurisation
-- Kubernetes : orchestration et virtualisation applicative
-- Services : réseau virtuel + DNS
-- PVC : persistance des données
-- Istio : proxy et exposition réseau
-- Architecture microservices Node.js
-
-## 16. Conclusion
-
-Ce projet permet à toute personne clonant le dépôt d’installer, déployer et tester une application microservices complète sur Kubernetes, en appliquant les concepts fondamentaux de conteneurisation et de virtualisation.
-
-## Auteur
-
-OKRY Marie-Grâce
+OKRY Marie‑Grâce
