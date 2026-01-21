@@ -220,10 +220,11 @@ macOS: dans /etc/hosts ajouter : 127.0.0.1 eventmesh.local
 
 Linux : dans /etc/hosts ajouter : IngressAddress eventmesh.local
 
-Vous trouverez IngressAddress en faisant minikube ip
+Vous trouverez IngressAddress en faisant kubectl get ingress et en récupérant l'adresse
+# Si l'adresse n'apparait pas, patientez un moment et relancez la commande, jusqu'à obtenir l'IngressAdress
 
 Option A : minikube tunnel (recommandé, expose directement sur port 80)
-sudo minikube tunnel
+minikube tunnel
 # (laisser ce terminal ouvert, puis ouvrir dans le navigateur)
 
 Option B : port-forward (alternative, utilise le port 8080)
