@@ -160,17 +160,22 @@ kubectl get pods
 # 6) Initialiser la base PostgreSQL (les commandes SQL sont en section 8)
 kubectl exec -it postgres-XXXXX -- psql -U admin -d eventdb
 
-# 7) Configurer /etc/hosts et lancer le port‑forward
-#   dans /etc/hosts ajouter :
-#   127.0.0.1 eventmesh.local
-kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80
+# 7) Configurer le DNS local et exposer l’Ingress
+#   Windows : dans C:\Windows\System32\drivers\etc\hosts ajouter : 127.0.0.1 eventmesh.local
+#   macOS/Linux : dans /etc/hosts ajouter : 127.0.0.1 eventmesh.local
+
+# Option A : minikube tunnel (recommandé, expose directement sur port 80)
+minikube tunnel
+# (laisser ce terminal ouvert, puis ouvrir dans le navigateur)
+
+# Option B : port-forward (alternative, utilise le port 8080)
+# kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80
 ```
 
-Puis ouvrir dans le navigateur :
+Puis ouvrir dans le navigateur (selon l’option choisie) :
 
-- `http://eventmesh.local:8080/`
-- `http://eventmesh.local:8080/api/events`
-- `http://eventmesh.local:8080/api/bookings`
+- **Avec `minikube tunnel`** : `http://eventmesh.local/`, `http://eventmesh.local/api/events`, `http://eventmesh.local/api/bookings`
+- **Avec port-forward** : `http://eventmesh.local:8080/`, `http://eventmesh.local:8080/api/events`, `http://eventmesh.local:8080/api/bookings`
 
 ---
 
@@ -221,21 +226,42 @@ kubectl wait --namespace ingress-nginx \
 127.0.0.1 eventmesh.local
 ```
 
-#### 7.3 Port‑forward de l’Ingress vers la machine locale
+#### 7.3 Exposer l’Ingress (deux options)
 
-Dans un terminal dédié (à laisser ouvert) :
+**Option A : `minikube tunnel` (recommandé, pas besoin de port spécifique)**
+
+Dans un terminal dédié (à laisser ouvert, avec droits admin sur Linux/macOS) :
+
+```bash
+# Windows (PowerShell en admin)
+minikube tunnel
+
+# macOS / Linux (peut nécessiter sudo)
+sudo minikube tunnel
+```
+
+Cette commande expose automatiquement tous les services LoadBalancer (dont l’Ingress NGINX) directement sur `127.0.0.1`.  
+**URLs à tester** (port 80 standard) :
+
+- **Frontend** : `http://eventmesh.local/`
+- **API events** : `http://eventmesh.local/api/events`
+- **API bookings** : `http://eventmesh.local/api/bookings`
+
+**Option B : Port-forward (alternative simple)**
+
+Si tu préfères utiliser un port spécifique :
 
 ```bash
 kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80
 ```
 
-#### 7.4 URLs à tester dans le navigateur
+**URLs à tester** (port 8080) :
 
 - **Frontend** : `http://eventmesh.local:8080/`
 - **API events** : `http://eventmesh.local:8080/api/events`
 - **API bookings** : `http://eventmesh.local:8080/api/bookings`
 
-Si ces trois URLs répondent, l’Ingress et le routage applicatif sont fonctionnels.
+> **Note** : Les deux options nécessitent un terminal ouvert. `minikube tunnel` est plus "propre" car ça simule un vrai LoadBalancer, mais le port-forward fonctionne aussi très bien.
 
 ---
 
