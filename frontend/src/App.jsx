@@ -117,6 +117,12 @@ function App() {
       .then(res => res.json())
       .then(setEvents)
       .catch(err => console.error("Erreur fetch:", err));
+    
+    // Charger les réservations depuis l'API
+    fetch('/api/bookings')
+      .then(res => res.json())
+      .then(setMyBookings)
+      .catch(err => console.error("Erreur fetch bookings:", err));
   }, []);
 
   const bookEvent = async () => {
@@ -127,7 +133,11 @@ function App() {
       body: JSON.stringify({ event_id: eventId, user_name: userName, quantity })
     });
     const booking = await res.json();
-    setMyBookings([booking, ...myBookings]);
+    // Recharger toutes les réservations depuis l'API pour avoir la liste à jour
+    fetch('/api/bookings')
+      .then(res => res.json())
+      .then(setMyBookings)
+      .catch(err => console.error("Erreur fetch bookings:", err));
     setUserName('');
     setQuantity(1);
   };
